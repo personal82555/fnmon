@@ -1,0 +1,4 @@
+Flask
+psutil
+Flask-SSE
+pandas

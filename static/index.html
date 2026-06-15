@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fnmon · fnOS</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --sidebar: #161b22;
+    --card: #161b22;
+    --card-border: #30363d;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --orange: #f0883e;
+    --red: #f85149;
+    --pink: #bc8cff;
+    --cyan: #56d4dd;
+    --sidebar-w: 64px;
+    --active-tab: #1f6feb;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--sidebar);
+    border-right: 1px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 4px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 10;
+  }
+  .sidebar .logo {
+    font-size: 22px;
+    margin-bottom: 16px;
+    opacity: .6;
+  }
+  .sidebar .tab-btn {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: var(--dim);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    position: relative;
+  }
+  .sidebar .tab-btn:hover {
+    background: rgba(255,255,255,.06);
+    color: var(--text);
+  }
+  .sidebar .tab-btn.active {
+    background: var(--active-tab);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(31,111,235,.3);
+  }
+  .sidebar .tab-btn .tooltip {
+    position: absolute;
+    left: 56px;
+    background: #1c2128;
+    color: var(--text);
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+  }
+  .sidebar .tab-btn:hover .tooltip {
+    opacity: 1;
+  }
+  .sidebar .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: auto;
+    margin-bottom: 12px;
+  }
+  .sidebar .status-dot.on { background: var(--green); }
+  .sidebar .status-dot.off { background: var(--red); }
+
+  /* ===== Main ===== */
+  .main {
+    flex: 1;
+    padding: 20px 24px;
+    max-width: calc(100vw - var(--sidebar-w));
+    overflow-x: hidden;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .panel h2 {
+    font-size: 18px; font-weight: 600;
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel h2 .badge {
+    font-size: 12px; font-weight: 400;
+    color: var(--dim);
+    margin-left: 8px;
+  }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--dim); margin-bottom: 10px;
+  }
+  .card-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  .stat-item .label {
+    font-size: 11px; color: var(--dim); margin-bottom: 2px;
+  }
+  .stat-item .value {
+    font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums;
+    overflow-wrap: break-word; word-wrap: break-word;
+  }
+  .stat-item .value.green { color: var(--green); }
+  .stat-item .value.orange { color: var(--orange); }
+  .stat-item .value.accent { color: var(--accent); }
+  .stat-item .value.pink { color: var(--pink); }
+  .stat-item .sub { font-size: 12px; color: var(--dim); }
+
+  /* Progress bar */
+  .progress-bar {
+    width: 100%; height: 10px;
+    background: #21262d; border-radius: 5px; overflow: hidden;
+    margin: 4px 0;
+  }
+  .progress-bar .fill {
+    height: 100%; border-radius: 5px;
+    transition: width .5s ease;
+  }
+
+  /* ===== Gauges (CPU) ===== */
+  .gauges-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 14px;
+  }
+  .gauge-wrap {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .gauge-wrap .core-label { font-size: 11px; color: var(--dim); }
+  .gauge-wrap .freq-val {
+    font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;
+    margin: 4px 0;
+  }
+  .gauge-wrap .freq-unit { font-size: 11px; color: var(--dim); font-weight: 400; }
+  .gauge-wrap .bar-wrapper {
+    width: 100%; height: 6px; background: #21262d; border-radius: 3px; overflow: hidden;
+  }
+  .gauge-wrap .bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+  /* ===== Chart ===== */
+  .chart-container {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 14px;
+  }
+  .chart-container .chart-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .chart-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .chart-legend .leg-item {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--dim);
+  }
+  .chart-legend .leg-dot { width: 10px; height: 3px; border-radius: 2px; }
+  .chart-container canvas { width: 100%; height: 160px; display: block; }
+
+  /* ===== Memory Donut ===== */
+  .mem-container { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .mem-donut { position: relative; width: 160px; height: 160px; flex-shrink: 0; }
+  .mem-donut canvas { width: 160px; height: 160px; }
+  .mem-donut .center {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .mem-donut .center .pct { font-size: 28px; font-weight: 700; }
+  .mem-donut .center .pct-label { font-size: 11px; color: var(--dim); }
+  .mem-details { flex: 1; min-width: 200px; }
+  .mem-details .row {
+    display: flex; justify-content: space-between;
+    padding: 5px 0; font-size: 13px;
+    border-bottom: 1px solid rgba(48,54,61,.4);
+  }
+  .mem-details .row:last-child { border: none; }
+  .mem-details .row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ===== Network ===== */
+  .net-grid { display: grid; gap: 10px; }
+  .net-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .net-card .iface-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: #1c2128; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .net-card .iface-info { flex: 1; min-width: 0; }
+  .net-card .iface-name { font-size: 13px; font-weight: 600; }
+  .net-card .iface-ip { font-size: 11px; color: var(--dim); }
+  .net-card .iface-traffic {
+    display: flex; gap: 20px; margin-top: 4px;
+  }
+  .net-card .traffic-item { font-size: 12px; }
+  .net-card .traffic-item .arrow { font-size: 10px; }
+  .net-card .traffic-item .speed { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .net-card .traffic-item .total { color: var(--dim); font-size: 11px; }
+
+  /* ===== Disk ===== */
+  .disk-grid { display: grid; gap: 10px; }
+  .disk-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 12px 16px;
+  }
+  .disk-card .disk-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .disk-card .disk-name { font-size: 13px; font-weight: 600; }
+  .disk-card .disk-pct { font-size: 13px; font-weight: 600; }
+  .disk-card .disk-detail { font-size: 11px; color: var(--dim); }
+  .disk-card .disk-io {
+    display: flex; gap: 16px; margin-top: 6px; font-size: 11px;
+  }
+  .disk-card .disk-io .r { color: var(--accent); }
+  .disk-card .disk-io .w { color: var(--orange); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 700px) {
+    .gauges-grid { grid-template-columns: repeat(2, 1fr); }
+    .mem-container { flex-direction: column; align-items: stretch; }
+    .main { padding: 14px; }
+  }
+  @media (max-width: 450px) {
+    :root { --sidebar-w: 48px; }
+    .sidebar .tab-btn { width: 36px; height: 36px; font-size: 16px; }
+    .main { padding: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Sidebar ===== -->
+<nav class="sidebar" id="sidebar">
+  <div class="logo">📊</div>
+  <button class="tab-btn active" data-tab="cpu" onclick="switchTab('cpu')">
+    ⚡<span class="tooltip">CPU</span>
+  </button>
+  <button class="tab-btn" data-tab="mem" onclick="switchTab('mem')">
+    🧠<span class="tooltip">内存</span>
+  </button>
+  <button class="tab-btn" data-tab="net" onclick="switchTab('net')">
+    🌐<span class="tooltip">网络</span>
+  </button>
+  <button class="tab-btn" data-tab="disk" onclick="switchTab('disk')">
+    💾<span class="tooltip">磁盘</span>
+  </button>
+  <button class="tab-btn" data-tab="app" onclick="switchTab('app')">
+    📱<span class="tooltip">应用</span>
+  </button>
+  <div style="flex:1"></div>
+  <button class="tab-btn" id="exportBtn" onclick="doExport()" title="一键导出所有历史数据">
+    ⬇️<span class="tooltip">导出</span>
+  </button>
+  <button class="tab-btn" id="exportConfigBtn" onclick="openExportConfig()" title="设置导出目录路径">
+    ⚙️<span class="tooltip">设置</span>
+  </button>
+  <div class="status-dot on" id="statusDot" title="实时"></div>
+</nav>
+
+<!-- ===== Main Content ===== -->
+<div class="main">
+
+  <!-- ==================== CPU Panel ==================== -->
+  <div class="panel active" id="panel-cpu">
+    <h2>⚡ CPU <span class="badge" id="cpuModel"></span></h2>
+    <!-- Stat cards -->
+    <div class="card-row" style="margin-bottom:14px">
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">Governor</div>
+          <div class="value accent" id="cpuGov">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">EPP</div>
+          <div class="value pink" id="cpuEpp">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">🌡 温度</div>
+          <div class="value orange" id="cpuTemp">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">频率范围</div>
+          <div class="value" id="cpuRange" style="font-size:15px">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">📊 负载</div>
+          <div class="value" id="cpuLoad">—</div>
+          <div class="sub" id="cpuLoadSub"></div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">🌬 风扇</div>
+          <div class="value" id="cpuFan" style="font-size:15px">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">⚙️ 运行模式</div>
+          <div class="value" id="cpuMode" style="font-size:13px">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">📻 Boost</div>
+          <div class="value" id="cpuOC" style="font-size:14px">—</div>
+          <div class="sub" id="cpuOCSub"></div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">💠 核心</div>
+          <div class="value" id="cpuCores" style="font-size:15px">—</div>
+        </div>
+      </div>
+    </div>
+    <!-- Per-core gauges -->
+    <div class="gauges-grid" id="gaugesGrid"></div>
+    <!-- Frequency history -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <span style="font-size:13px;font-weight:600">📈 频率历史 (60s)</span>
+        <div class="chart-legend" id="cpuLegend"></div>
+      </div>
+      <canvas id="cpuChart"></canvas>
+    </div>
+
+    <!-- Process ranking -->
+    <div class="card">
+      <div class="card-title">🔝 进程 CPU 占用排行 (Top 20)</div>
+      <div id="procTable" style="font-size:12px;max-height:400px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="color:var(--dim);font-size:11px;text-align:left">
+            <th style="padding:3px 6px">PID</th>
+            <th>用户</th>
+            <th>CPU%</th>
+            <th>内存%</th>
+            <th>启动时间</th>
+            <th>进程</th>
+          </tr></thead>
+          <tbody id="procBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Benchmark scores -->
+    <div class="card">
+      <div class="card-title">📊 性能评测</div>
+      <div class="card-row" id="benchGrid" style="margin-bottom:0"></div>
+    </div>
+
+    <!-- CPU comparison -->
+    <div class="card" style="margin-top:14px">
+      <div class="card-title">🆚 同级CPU对比 (PassMark多核)</div>
+      <div id="compareChart" style="margin-top:4px"></div>
+    </div>
+  </div>
+
+  <!-- ==================== Memory Panel ==================== -->
+  <div class="panel" id="panel-mem">
+    <h2>🧠 内存 <span class="badge" id="memTotal"></span></h2>
+    <div class="card" style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+      <div class="mem-donut">
+        <canvas id="memDonut" width="320" height="320"></canvas>
+        <div class="center">
+          <div class="pct" id="memPct">—</div>
+          <div class="pct-label">已用</div>
+        </div>
+      </div>
+      <div class="mem-details" style="flex:1;min-width:200px">
+        <div class="row"><span>总计</span><span class="val" id="memTotalVal">—</span></div>
+        <div class="row"><span>已用</span><span class="val orange" id="memUsedVal">—</span></div>
+        <div class="row"><span>可用</span><span class="val green" id="memAvailVal">—</span></div>
+        <div class="row"><span>空闲</span><span class="val" id="memFreeVal">—</span></div>
+        <div class="row"><span>缓存</span><span class="val accent" id="memCachedVal">—</span></div>
+        <div class="row" style="border-top:1px solid rgba(48,54,61,.6);margin-top:4px;padding-top:8px">
+          <span>💱 交换分区</span><span class="val" id="memSwapVal">—</span>
+        </div>
+        <div class="row">
+          <span>交换已用</span><span class="val orange" id="memSwapUsedVal">—</span>
+        </div>
+        <div style="margin-top:8px">
+          <div class="progress-bar"><div class="fill" id="memBar" style="width:0%;background:var(--orange)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Network Panel ==================== -->
+  <div class="panel" id="panel-net">
+    <h2>🌐 网络 <span class="badge" id="netInfo"></span></h2>
+    <!-- Traffic Stats -->
+    <div class="card-row" style="margin-bottom:14px">
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">📊 总流量</div>
+          <div class="value" id="trafficTotal" style="font-size:15px">—</div>
+          <div class="sub">▼ <span id="trafficTotalRX">—</span> · ▲ <span id="trafficTotalTX">—</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">📅 本月流量</div>
+          <div class="value accent" id="trafficMonth" style="font-size:15px">—</div>
+          <div class="sub">▼ <span id="trafficMonthRX">—</span> · ▲ <span id="trafficMonthTX">—</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="stat-item">
+          <div class="label">📆 今日流量</div>
+          <div class="value green" id="trafficDay" style="font-size:15px">—</div>
+          <div class="sub">▼ <span id="trafficDayRX">—</span> · ▲ <span id="trafficDayTX">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- App Ranking -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">🏆 应用流量排行 (Top 15)</div>
+      <div id="trafficRanking" style="font-size:12px;color:var(--dim)">加载中…</div>
+    </div>
+
+    <!-- Interface cards -->
+    <div class="net-grid" id="netGrid"></div>
+    <div class="chart-container" style="margin-top:14px">
+      <div class="chart-header">
+        <span style="font-size:13px;font-weight:600">📈 流量趋势 (60s)</span>
+        <div class="chart-legend">
+          <span class="leg-item"><span class="leg-dot" style="background:var(--accent)"></span>下载</span>
+          <span class="leg-item"><span class="leg-dot" style="background:var(--orange)"></span>上传</span>
+        </div>
+      </div>
+      <canvas id="netChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ==================== Disk Panel ==================== -->
+  <div class="panel" id="panel-disk">
+    <h2>💾 磁盘 <span class="badge" id="diskInfo"></span></h2>
+    <!-- Physical drive health -->
+    <div id="driveGrid" style="display:grid;gap:10px;margin-bottom:14px"></div>
+    <!-- Mount points -->
+    <div class="disk-grid" id="diskGrid"></div>
+    <div class="chart-container" style="margin-top:14px">
+      <div class="chart-header">
+        <span style="font-size:13px;font-weight:600">📈 磁盘 I/O (60s)</span>
+        <div class="chart-legend">
+          <span class="leg-item"><span class="leg-dot" style="background:var(--accent)"></span>读取</span>
+          <span class="leg-item"><span class="leg-dot" style="background:var(--orange)"></span>写入</span>
+        </div>
+      </div>
+      <canvas id="diskChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ==================== Apps Panel ==================== -->
+  <div class="panel" id="panel-app">
+    <h2>📱 应用用量排行 <span class="badge" id="appPeriod"></span></h2>
+    <!-- Period selector -->
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <button class="period-btn active" data-period="total" onclick="switchAppPeriod('total',this)" style="padding:4px 12px;border:1px solid var(--card-border);background:var(--card);color:var(--text);border-radius:6px;cursor:pointer;font-size:12px">📊 总计</button>
+      <button class="period-btn" data-period="year" onclick="switchAppPeriod('year',this)" style="padding:4px 12px;border:1px solid var(--card-border);background:var(--card);color:var(--text);border-radius:6px;cursor:pointer;font-size:12px">📅 年</button>
+      <button class="period-btn" data-period="month" onclick="switchAppPeriod('month',this)" style="padding:4px 12px;border:1px solid var(--card-border);background:var(--card);color:var(--text);border-radius:6px;cursor:pointer;font-size:12px">📆 月</button>
+      <button class="period-btn" data-period="week" onclick="switchAppPeriod('week',this)" style="padding:4px 12px;border:1px solid var(--card-border);background:var(--card);color:var(--text);border-radius:6px;cursor:pointer;font-size:12px">📋 周</button>
+      <button class="period-btn" data-period="day" onclick="switchAppPeriod('day',this)" style="padding:4px 12px;border:1px solid var(--card-border);background:var(--card);color:var(--text);border-radius:6px;cursor:pointer;font-size:12px">📌 日</button>
+    </div>
+    <!-- Combined ranking -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">🏆 综合排行 (CPU + 内存 + 网络 加权)</div>
+      <div id="appRanking"></div>
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:var(--dim);padding:12px 0;border-top:1px solid var(--card-border);margin-top:8px">
+    <span id="footerInfo">fnmon · 正在更新…</span>
+  </div>
+</div>
+
+<script>
+// ==================== Config ====================
+const CORE_COLORS = ['#58a6ff', '#3fb950', '#d29922', '#bc8cff', '#f0883e', '#f85149'];
+
+// ==================== Tab Switching ====================
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+}
+
+let appPeriod = 'total';
+function switchAppPeriod(p, btn) {
+  appPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Reload app ranking with new period
+  fetch('/api/apps/' + p).then(r => r.json()).then(data => renderAppRanking(data));
+}
+
+// ==================== Utility ====================
+function fmtBytes(b) {
+  if (!b) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0; let v = b;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return v.toFixed(i === 0 ? 0 : 1) + ' ' + u[i];
+}
+function fmtSpeed(bps) {
+  if (!bps || bps < 0) return '0 b/s';
+  const u = ['', 'K', 'M', 'G'];
+  let i = 0; let v = bps * 8;
+  while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
+  return v.toFixed(i === 0 ? 0 : 1) + ' ' + u[i] + 'bps';
+}
+function fmtFreq(mhz) {
+  if (mhz >= 1000) return (mhz / 1000).toFixed(2) + ' GHz';
+  return mhz + ' MHz';
+}
+function minMax(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+
+// ==================== Data Store ====================
+const MAX_HIST = 30;
+let cpuHist = {};
+let netHistRx = { _main: [] };
+let netHistTx = { _main: [] };
+let diskHistR = {};
+let diskHistW = {};
+let maxFreq = 3700;
+let coreCount = 0;
+
+// ==================== CPU Rendering ====================
+function buildGauges() {
+  const grid = document.getElementById('gaugesGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < coreCount; i++) {
+    const idx = i % CORE_COLORS.length;
+    const div = document.createElement('div');
+    div.className = 'gauge-wrap'; div.id = `gauge-${i}`;
+    div.innerHTML = `
+      <div class="core-label">CPU${i}</div>
+      <div class="freq-val" id="freq-${i}">— <span class="freq-unit">MHz</span></div>
+      <div class="bar-wrapper"><div class="bar-fill" id="bar-${i}"></div></div>`;
+    grid.appendChild(div);
+  }
+}
+function updateCPU(data) {
+  const d = data.cpu;
+  if (!d) return;
+  document.getElementById('cpuGov').textContent = d.governor || '—';
+  document.getElementById('cpuEpp').textContent = d.epp || '—';
+  if (d.temp_max) {
+    document.getElementById('cpuTemp').textContent = d.temp_max + '°C';
+  }
+  document.getElementById('cpuRange').textContent = `${d.min_freq}–${d.max_freq} MHz`;
+  if (d.load_1 !== undefined) {
+    document.getElementById('cpuLoad').textContent = d.load_1.toFixed(2);
+    document.getElementById('cpuLoadSub').textContent = `${d.load_5.toFixed(2)} / ${d.load_15.toFixed(2)}`;
+  }
+  // Model
+  if (d.model_short) document.getElementById('cpuModel').textContent = d.model_short;
+  // Fan
+  if (d.fan_rpm) {
+    document.getElementById('cpuFan').innerHTML = `${d.fan_rpm.rpm} <span style="font-size:12px;color:var(--dim)">RPM</span>`;
+  } else {
+    document.getElementById('cpuFan').innerHTML = '<span style="font-size:12px;color:var(--dim)">无传感器</span>';
+  }
+  // Mode
+  document.getElementById('cpuMode').textContent = `${d.governor || '?'} / ${d.epp || '?'}`;
+  // OC / Turbo
+  if (d.oc) {
+    document.getElementById('cpuOC').textContent = '🚀 已超频';
+    document.getElementById('cpuOCSub').textContent = '';
+  } else if (d.turbo) {
+    document.getElementById('cpuOC').textContent = '⚡ Turbo Boost';
+    document.getElementById('cpuOCSub').textContent = `基频 ${d.base_freq}MHz`;
+  } else {
+    document.getElementById('cpuOC').textContent = '基频运行';
+    document.getElementById('cpuOCSub').textContent = `${d.base_freq || d.min_freq}MHz`;
+  }
+  // Core count
+  if (d.physical_cores) {
+    const ht = d.threads > d.physical_cores ? ` (HT: ${d.threads}T)` : '';
+    document.getElementById('cpuCores').innerHTML = `${d.physical_cores}C${ht}`;
+  }
+  // Benchmark
+  if (d.bench) {
+    const b = d.bench;
+    const items = [
+      {label:'PassMark 单核', v:b.passmark_single},
+      {label:'PassMark 多核', v:b.passmark_multi, hl:true},
+      {label:'Cinebench R23 单', v:b.cinebench_r23_single},
+      {label:'Cinebench R23 多', v:b.cinebench_r23_multi},
+      {label:'Geekbench 6 单', v:b.geekbench6_single},
+      {label:'Geekbench 6 多', v:b.geekbench6_multi},
+    ];
+    document.getElementById('benchGrid').innerHTML = items.map(i =>
+      `<div class="stat-item" style="padding:4px 0"><div class="label">${i.label}</div>
+        <div class="value" style="font-size:14px;${i.hl?'color:var(--accent)':''}">${i.v}</div></div>`
+    ).join('');
+  }
+  // Comparison chart
+  if (d.compare) {
+    const your = d.compare.find(c => c.name.includes('9100T'));
+    const myScore = your ? your.score : d.bench ? d.bench.passmark_multi : 5500;
+    const maxScore = Math.max(...d.compare.map(c => c.score), 1);
+    document.getElementById('compareChart').innerHTML = d.compare.map(c => {
+      const pct = Math.round(c.score / maxScore * 100);
+      const isMe = c.name.includes('9100T');
+      const barColor = isMe ? 'var(--accent)' : 'var(--card-border)';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span style="width:120px;font-size:11px;text-align:right;color:${isMe?'var(--accent)':'var(--dim)'}">${c.name}</span>
+        <div style="flex:1;height:8px;background:#21262d;border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;${isMe?'box-shadow:0 0 6px var(--accent)':''}"></div>
+        </div>
+        <span style="width:50px;font-size:11px;text-align:right;font-weight:600">${c.score}</span>
+        <span style="width:30px;font-size:10px;color:var(--dim)">${c.tdp}W</span>
+        <span style="font-size:10px;color:var(--dim)">${c.note}</span>
+      </div>`;
+    }).join('');
+  }
+  if (d.max_freq > 0) maxFreq = d.max_freq;
+  // Gauges
+  if (d.freqs) {
+    for (const [core, freq] of Object.entries(d.freqs)) {
+      const idx = parseInt(core.replace('cpu', ''));
+      const el = document.getElementById(`freq-${idx}`);
+      if (!el) continue;
+      const pct = maxFreq > 0 ? minMax((freq / maxFreq) * 100, 0, 100) : 0;
+      el.innerHTML = `${freq} <span class="freq-unit">MHz</span>`;
+      const bar = document.getElementById(`bar-${idx}`);
+      if (bar) {
+        bar.style.width = pct + '%';
+        bar.style.background = pct > 80 ? CORE_COLORS[idx % CORE_COLORS.length].replace(')', ',.8)').replace('rgb','rgba') || CORE_COLORS[idx % CORE_COLORS.length] : CORE_COLORS[idx % CORE_COLORS.length];
+        if (pct > 70) bar.style.background = `linear-gradient(90deg, ${CORE_COLORS[idx % CORE_COLORS.length]}, #f85149)`;
+      }
+      // History
+      if (!cpuHist[core]) cpuHist[core] = [];
+      cpuHist[core].push(freq);
+      if (cpuHist[core].length > MAX_HIST) cpuHist[core].shift();
+    }
+    drawCPUChart();
+  }
+}
+
+function drawCPUChart() {
+  const canvas = document.getElementById('cpuChart');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const pad = { top: 8, right: 40, bottom: 22, left: 44 };
+  const pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, w * dpr, h * dpr);
+  ctx.scale(dpr, dpr);
+  ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+  ctx.font = '10px sans-serif'; ctx.fillStyle = '#8b949e';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ph * (1 - i / 4));
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillText(Math.round((i / 4) * maxFreq), 2, y + 4);
+  }
+  const keys = Object.keys(cpuHist).sort();
+  const len = keys.length > 0 ? cpuHist[keys[0]].length : 0;
+  if (len < 2) { ctx.restore(); return; }
+  for (let ci = 0; ci < keys.length; ci++) {
+    const data = cpuHist[keys[ci]];
+    if (!data || data.length < 2) continue;
+    ctx.strokeStyle = CORE_COLORS[ci % CORE_COLORS.length];
+    ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = pad.left + (i / (data.length - 1)) * pw;
+      const y = pad.top + ph * (1 - (data[i] / (maxFreq || 3700)));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // Right edge label
+    const val = data[data.length - 1];
+    ctx.fillStyle = CORE_COLORS[ci % CORE_COLORS.length];
+    ctx.font = '600 10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${val}`, w - pad.right + 4, pad.top + ph * (1 - (val / (maxFreq || 3700))) + 3);
+  }
+}
+
+// ==================== Memory Rendering ====================
+function updateMem(data) {
+  const d = data.mem;
+  if (!d) return;
+  document.getElementById('memTotal').textContent = fmtBytes(d.total * 1024);
+  document.getElementById('memTotalVal').textContent = fmtBytes(d.total * 1024);
+  document.getElementById('memUsedVal').textContent = fmtBytes(d.used * 1024);
+  document.getElementById('memAvailVal').textContent = fmtBytes(d.available * 1024);
+  document.getElementById('memFreeVal').textContent = fmtBytes(d.free * 1024);
+  document.getElementById('memCachedVal').textContent = fmtBytes((d.cached + d.buffers) * 1024);
+  document.getElementById('memSwapVal').textContent = fmtBytes(d.swap_total * 1024);
+  document.getElementById('memSwapUsedVal').textContent = fmtBytes(d.swap_used * 1024);
+  const pct = d.used_pct || 0;
+  document.getElementById('memPct').textContent = pct + '%';
+  document.getElementById('memBar').style.width = pct + '%';
+  drawMemDonut(pct);
+}
+
+function drawMemDonut(pct) {
+  const canvas = document.getElementById('memDonut');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = 160, h = 160;
+  ctx.clearRect(0, 0, 320, 320);
+  ctx.scale(2, 2);
+  const cx = w / 2, cy = h / 2, r = 62, lw = 18;
+  const angle = (pct / 100) * Math.PI * 2;
+  // Background
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = '#21262d'; ctx.lineWidth = lw; ctx.stroke();
+  // Used
+  ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + angle);
+  const grad = ctx.createConicGradient(-Math.PI / 2, cx, cy);
+  grad.addColorStop(0, '#f0883e'); grad.addColorStop(1, '#f85149');
+  ctx.strokeStyle = grad; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
+}
+
+// ==================== Network Rendering ====================
+function updateNet(data) {
+  const d = data.net;
+  if (!d || !d.interfaces) return;
+  const grid = document.getElementById('netGrid');
+  // Render cards
+  grid.innerHTML = '';
+  let mainRx = 0, mainTx = 0;
+  for (let i = 0; i < d.interfaces.length; i++) {
+    const iface = d.interface_names[i];
+    const info = d.interfaces[i];
+    const isMain = iface.startsWith('eno') || iface.startsWith('enx');
+    if (isMain) { mainRx += info.rx_speed || 0; mainTx += info.tx_speed || 0; }
+    const icon = iface.startsWith('eno') || iface.startsWith('enx') ? '🔌' :
+                 iface.startsWith('br-') ? '🔀' :
+                 iface.startsWith('docker') ? '🐳' :
+                 iface.startsWith('tun') ? '🔒' : '🔗';
+    const card = document.createElement('div');
+    card.className = 'net-card';
+    card.innerHTML = `
+      <div class="iface-icon">${icon}</div>
+      <div class="iface-info">
+        <div class="iface-name">${info.display || iface} <span style="font-size:10px;color:var(--dim)">${iface}</span></div>
+        <div class="iface-traffic">
+          <span class="traffic-item"><span class="arrow" style="color:var(--accent)">▼</span> <span class="speed" style="color:var(--accent)">${fmtSpeed(info.rx_speed)}</span> <span class="total">${fmtBytes(info.rx_bytes)}</span></span>
+          <span class="traffic-item"><span class="arrow" style="color:var(--orange)">▲</span> <span class="speed" style="color:var(--orange)">${fmtSpeed(info.tx_speed)}</span> <span class="total">${fmtBytes(info.tx_bytes)}</span></span>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  }
+  // History for main interfaces
+  netHistRx._main.push(mainRx);
+  netHistTx._main.push(mainTx);
+  if (netHistRx._main.length > MAX_HIST) netHistRx._main.shift();
+  if (netHistTx._main.length > MAX_HIST) netHistTx._main.shift();
+  drawNetChart();
+  document.getElementById('netInfo').textContent = `${d.interfaces.length} 个接口`;
+}
+
+function drawNetChart() {
+  const canvas = document.getElementById('netChart');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const pad = { top: 8, right: 8, bottom: 22, left: 50 };
+  const pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, w * dpr, h * dpr);
+  ctx.scale(dpr, dpr);
+
+  const rx = netHistRx._main, tx = netHistTx._main;
+  const len = rx.length;
+  if (len < 2) return;
+  const maxV = Math.max(...rx, ...tx, 1);
+
+  ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+  ctx.font = '10px sans-serif'; ctx.fillStyle = '#8b949e';
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.top + (ph * (1 - i / 3));
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillText(fmtSpeed((i / 3) * maxV), 2, y + 4);
+  }
+  // RX line
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < len; i++) {
+    const x = pad.left + (i / (len - 1)) * pw;
+    const y = pad.top + ph * (1 - rx[i] / maxV);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  } ctx.stroke();
+  // TX line
+  ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < len; i++) {
+    const x = pad.left + (i / (len - 1)) * pw;
+    const y = pad.top + ph * (1 - tx[i] / maxV);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  } ctx.stroke();
+}
+
+// ==================== Traffic Stats ====================
+function updateTraffic(data) {
+  const t = data.traffic;
+  if (!t) return;
+  document.getElementById('trafficTotal').textContent = fmtBytes(t.total_rx + t.total_tx);
+  document.getElementById('trafficTotalRX').textContent = fmtBytes(t.total_rx);
+  document.getElementById('trafficTotalTX').textContent = fmtBytes(t.total_tx);
+  document.getElementById('trafficMonth').textContent = fmtBytes(t.monthly_rx + t.monthly_tx);
+  document.getElementById('trafficMonthRX').textContent = fmtBytes(t.monthly_rx);
+  document.getElementById('trafficMonthTX').textContent = fmtBytes(t.monthly_tx);
+  document.getElementById('trafficDay').textContent = fmtBytes(t.daily_rx + t.daily_tx);
+  document.getElementById('trafficDayRX').textContent = fmtBytes(t.daily_rx);
+  document.getElementById('trafficDayTX').textContent = fmtBytes(t.daily_tx);
+  // Ranking
+  if (t.containers && t.containers.length) {
+    const maxW = Math.max(...t.containers.map(c => c.rx + c.tx), 1);
+    const html = t.containers.map((c, i) => {
+      const pct = Math.round((c.rx + c.tx) / maxW * 100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="width:20px;text-align:right;font-weight:600;color:var(--dim)">${i+1}.</span>
+        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</span>
+        <div style="flex:2;min-width:40px;height:6px;background:#21262d;border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:3px;opacity:.7"></div>
+        </div>
+        <span style="width:80px;text-align:right;font-variant-numeric:tabular-nums;font-size:11px">▼${fmtBytes(c.rx)} ▲${fmtBytes(c.tx)}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('trafficRanking').innerHTML = html;
+  }
+}
+
+// ==================== Process Ranking ====================
+function updateProcs(data) {
+  const procs = data.procs;
+  if (!procs || !procs.length) return;
+  const tbody = document.getElementById('procBody');
+  tbody.innerHTML = procs.map((p, i) => {
+    const cpu = parseFloat(p.cpu) || 0;
+    const color = cpu > 50 ? '#f85149' : cpu > 20 ? '#f0883e' : cpu > 5 ? '#d29922' : 'var(--text)';
+    return `<tr style="border-bottom:1px solid rgba(48,54,61,.3);line-height:22px">
+      <td style="padding:2px 6px;color:var(--dim)">${p.pid}</td>
+      <td style="font-size:11px;color:var(--dim)">${p.user}</td>
+      <td style="color:${color};font-weight:600">${p.cpu}</td>
+      <td style="font-size:11px;color:var(--dim)">${p.mem}%</td>
+      <td style="font-size:11px;color:var(--dim)">${p.start}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.cmd}">${p.cmd}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ==================== App Ranking ====================
+function renderAppRanking(apps) {
+  const el = document.getElementById('appRanking');
+  if (!apps || !apps.length) { el.innerHTML = '<span style="color:var(--dim)">收集数据中…</span>'; return; }
+  const maxScore = Math.max(...apps.map(a => a.score), 0.01);
+  document.getElementById('appPeriod').textContent =
+    appPeriod === 'day' ? '今日' : appPeriod === 'week' ? '本周' :
+    appPeriod === 'month' ? '本月' : appPeriod === 'year' ? '今年' : '总计';
+  el.innerHTML = apps.map((a, i) => {
+    const pct = Math.round(a.score / maxScore * 100);
+    const med = i < 3 ? `var(--green)` : 'var(--accent)';
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:12px">
+      <span style="width:18px;text-align:right;font-weight:600;color:var(--dim)">${i+1}</span>
+      <span style="flex:1;min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.app}</span>
+      <div style="flex:2;height:8px;background:#21262d;border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${med};border-radius:4px;opacity:.8"></div>
+      </div>
+      <span style="width:40px;text-align:right;font-size:11px;color:var(--dim)">${a.score.toFixed(1)}</span>
+      <span style="width:55px;text-align:right;font-size:11px;color:var(--accent);font-weight:600">CPU ${a.cpu?.toFixed(1)||0}%</span>
+      <span style="width:55px;text-align:right;font-size:11px;color:var(--orange)">MEM ${a.mem?.toFixed(0)||0}M</span>
+      <span style="width:60px;text-align:right;font-size:11px;color:var(--dim)">${fmtBytes(a.net_total||0)}</span>
+    </div>`;
+  }).join('');
+}
+function updateApps(data) {
+  if (data.apps) renderAppRanking(data.apps);
+}
+
+// ==================== Disk Rendering ====================
+function updateDisk(data) {
+  const d = data.disk;
+  if (!d) return;
+
+  // === Physical drive health ===
+  if (d.drives && d.drives.length) {
+    const driveGrid = document.getElementById('driveGrid');
+    driveGrid.innerHTML = d.drives.map(drive => {
+      const h = drive.health || {};
+      const icon = drive.type === 'NVMe' ? '⚡' : drive.type === 'SSD' ? '💿' : '🖴';
+      // Health color
+      let statusColor = 'var(--green)';
+      let statusIcon = '✅';
+      if (h.status === 'FAILED') { statusColor = 'var(--red)'; statusIcon = '🔴'; }
+      else if (h.status === 'UNKNOWN') { statusColor = 'var(--dim)'; statusIcon = '❓'; }
+
+      // Temp color
+      const temp = h.temp || 0;
+      let tempColor = 'var(--green)';
+      if (temp > 55) tempColor = 'var(--red)';
+      else if (temp > 45) tempColor = 'var(--orange)';
+
+      const rows = [
+        `<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+          <span>${icon}</span>
+          <span style="font-weight:600;font-size:13px">${drive.model}</span>
+          <span style="font-size:11px;color:var(--dim);margin-left:4px">${drive.size} ${drive.type} ${drive.interface}</span>
+        </div>`,
+        `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:4px">`,
+        h.temp !== undefined ? `<span>🌡 <span style="color:${tempColor};font-weight:600">${h.temp}°C</span></span>` : '',
+        h.status ? `<span>${statusIcon} <span style="color:${statusColor};font-weight:600">${h.status}</span></span>` : '',
+        h.life_remaining !== undefined ? `<span>❤️ 寿命剩余 <span style="color:${h.life_remaining>50?'var(--green)':h.life_remaining>20?'var(--orange)':'var(--red)'};font-weight:600">${h.life_remaining}%</span></span>` : '',
+        h.reallocated !== undefined ? `<span>⚠️ 坏道: <span style="color:${h.reallocated>0?'var(--orange)':'var(--green)'};font-weight:600">${h.reallocated}</span></span>` : '',
+        h.available_spare !== undefined ? `<span>💾 备用块: <span style="color:${h.available_spare>50?'var(--green)':'var(--orange)'};font-weight:600">${h.available_spare}%</span></span>` : '',
+        h.power_on_days !== undefined ? `<span>⏱ 通电 ${h.power_on_days}天</span>` : '',
+        h.data_written ? `<span>📤 写入 ${h.data_written}</span>` : '',
+        `</div>`
+      ].filter(s => s).join('');
+
+      return `<div class="card" style="margin:0">${rows}</div>`;
+    }).join('');
+  }
+
+  // === Mount points ===
+  const grid = document.getElementById('diskGrid');
+  grid.innerHTML = '';
+  if (d.mounts) {
+    for (const m of d.mounts) {
+      const pct = m.used_pct || 0;
+      const color = pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--orange)' : 'var(--accent)';
+      const card = document.createElement('div');
+      card.className = 'disk-card';
+      const ioR = d.devices ? Object.values(d.devices).reduce((s, v) => s + (v.read_speed || 0), 0) : 0;
+      const ioW = d.devices ? Object.values(d.devices).reduce((s, v) => s + (v.write_speed || 0), 0) : 0;
+      card.innerHTML = `
+        <div class="disk-header">
+          <span class="disk-name">${m.mount}</span>
+          <span class="disk-pct" style="color:${color}">${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="disk-detail">${fmtBytes(m.used)} / ${fmtBytes(m.total)}</div>`;
+      grid.appendChild(card);
+    }
+  }
+  // I/O history for main devices
+  if (d.devices) {
+    let totalR = 0, totalW = 0;
+    for (const [name, dev] of Object.entries(d.devices)) {
+      if (name.startsWith('sd') || name.startsWith('nvme')) {
+        totalR += dev.read_speed || 0;
+        totalW += dev.write_speed || 0;
+      }
+    }
+    if (!diskHistR._main) diskHistR._main = [];
+    if (!diskHistW._main) diskHistW._main = [];
+    diskHistR._main.push(totalR);
+    diskHistW._main.push(totalW);
+    if (diskHistR._main.length > MAX_HIST) diskHistR._main.shift();
+    if (diskHistW._main.length > MAX_HIST) diskHistW._main.shift();
+  }
+  drawDiskChart();
+  document.getElementById('diskInfo').textContent = `${d.mounts ? d.mounts.length : 0} 个挂载点`;
+}
+
+function drawDiskChart() {
+  const canvas = document.getElementById('diskChart');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const pad = { top: 8, right: 8, bottom: 22, left: 50 };
+  const pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, w * dpr, h * dpr);
+  ctx.scale(dpr, dpr);
+
+  const rd = diskHistR._main || [], wd = diskHistW._main || [];
+  const len = rd.length;
+  if (len < 2) return;
+  const maxV = Math.max(...rd, ...wd, 1);
+
+  ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+  ctx.font = '10px sans-serif'; ctx.fillStyle = '#8b949e';
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.top + (ph * (1 - i / 3));
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillText(fmtSpeed(i / 3 * maxV), 2, y + 4);
+  }
+  // Read
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < len; i++) {
+    const x = pad.left + (i / (len - 1)) * pw;
+    const y = pad.top + ph * (1 - (rd[i] || 0) / maxV);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  } ctx.stroke();
+  // Write
+  ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < len; i++) {
+    const x = pad.left + (i / (len - 1)) * pw;
+    const y = pad.top + ph * (1 - (wd[i] || 0) / maxV);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  } ctx.stroke();
+}
+
+// ==================== Traffic Stats Rendering ====================
+function updateTraffic(data) {
+  const d = data.traffic;
+  if (!d) return;
+
+  // Total
+  const totalBytes = (d.total_rx || 0) + (d.total_tx || 0);
+  document.getElementById('trafficTotal').textContent = fmtBytes(totalBytes);
+  document.getElementById('trafficTotalRX').textContent = fmtBytes(d.total_rx || 0);
+  document.getElementById('trafficTotalTX').textContent = fmtBytes(d.total_tx || 0);
+
+  // Monthly
+  const monthBytes = (d.monthly_rx || 0) + (d.monthly_tx || 0);
+  document.getElementById('trafficMonth').textContent = fmtBytes(monthBytes);
+  document.getElementById('trafficMonthRX').textContent = fmtBytes(d.monthly_rx || 0);
+  document.getElementById('trafficMonthTX').textContent = fmtBytes(d.monthly_tx || 0);
+
+  // Daily
+  const dayBytes = (d.daily_rx || 0) + (d.daily_tx || 0);
+  document.getElementById('trafficDay').textContent = fmtBytes(dayBytes);
+  document.getElementById('trafficDayRX').textContent = fmtBytes(d.daily_rx || 0);
+  document.getElementById('trafficDayTX').textContent = fmtBytes(d.daily_tx || 0);
+
+  // App Ranking
+  const rankingEl = document.getElementById('trafficRanking');
+  if (d.containers && d.containers.length > 0) {
+    let html = '<table style="width:100%;border-collapse:collapse">';
+    html += '<thead><tr style="font-size:11px;color:var(--dim);border-bottom:1px solid var(--card-border)">';
+    html += '<th style="text-align:left;padding:4px 6px">#</th>';
+    html += '<th style="text-align:left;padding:4px 6px">应用</th>';
+    html += '<th style="text-align:right;padding:4px 6px">▼ 下载</th>';
+    html += '<th style="text-align:right;padding:4px 6px">▲ 上传</th>';
+    html += '<th style="text-align:right;padding:4px 6px">合计</th>';
+    html += '<th style="text-align:right;padding:4px 6px">实时速率</th>';
+    html += '</tr></thead><tbody>';
+    const maxTotal = d.containers[0] ? (d.containers[0].rx + d.containers[0].tx) : 1;
+    const topColors = ['#f0883e','#d29922','#58a6ff','#3fb950','#bc8cff'];
+    for (let i = 0; i < d.containers.length; i++) {
+      const c = d.containers[i];
+      const totalC = (c.rx || 0) + (c.tx || 0);
+      const pct = maxTotal > 0 ? (totalC / maxTotal * 100) : 0;
+      const rxStr = fmtBytes(c.rx || 0);
+      const txStr = fmtBytes(c.tx || 0);
+      const totalStr = fmtBytes(totalC);
+      const speedStr = fmtSpeed((c.rx_speed || 0) + (c.tx_speed || 0));
+      const rankBg = i < topColors.length ? topColors[i] : 'var(--dim)';
+      html += `<tr style="border-bottom:1px solid rgba(48,54,61,.3)">`;
+      html += `<td style="padding:6px 6px;font-weight:700;color:${rankBg};font-size:11px">${i + 1}</td>`;
+      html += `<td style="padding:6px 6px;font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="${c.name}">${c.name}</td>`;
+      html += `<td style="padding:6px 6px;text-align:right;font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums">${rxStr}</td>`;
+      html += `<td style="padding:6px 6px;text-align:right;font-size:11px;color:var(--orange);font-variant-numeric:tabular-nums">${txStr}</td>`;
+      html += `<td style="padding:6px 6px;text-align:right;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums">${totalStr}</td>`;
+      html += `<td style="padding:6px 6px;text-align:right;font-size:11px;color:var(--green);font-variant-numeric:tabular-nums">${speedStr}</td>`;
+      html += '</tr>';
+      // Mini progress bar per row
+      html += `<tr style="border:none"><td colspan="6" style="padding:0 6px 6px 6px"><div class="progress-bar" style="height:3px"><div class="fill" style="width:${pct.toFixed(1)}%;background:${i === 0 ? 'var(--orange)' : 'var(--active-tab)'};opacity:${Math.max(0.3, 1 - i * 0.07)}"></div></div></td></tr>`;
+    }
+    html += '</tbody></table>';
+    rankingEl.innerHTML = html;
+  } else {
+    rankingEl.innerHTML = '<span style="color:var(--dim)">暂无容器数据</span>';
+  }
+}
+
+// ==================== SSE ====================
+function connectSSE() {
+  const dot = document.getElementById('statusDot');
+  const evtSource = new EventSource('/stream');
+  evtSource.onopen = () => { dot.className = 'status-dot on'; };
+  evtSource.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      updateCPU(data);
+      updateMem(data);
+      updateNet(data);
+      updateDisk(data);
+      updateTraffic(data);
+      updateProcs(data);
+      updateApps(data);
+      const t = new Date(data.ts * 1000);
+      document.getElementById('footerInfo').textContent = `fnmon · 更新于 ${t.toLocaleTimeString()}`;
+    } catch (err) {}
+  };
+  evtSource.onerror = () => { dot.className = 'status-dot off'; };
+}
+
+// ==================== Init ====================
+async function init() {
+  try {
+    const res = await fetch('/api/all');
+    const data = await res.json();
+    if (data.cpu && data.cpu.freqs) {
+      coreCount = Object.keys(data.cpu.freqs).length;
+      maxFreq = data.cpu.hw_max || data.cpu.max_freq || 3700;
+      buildGauges();
+      // Build legend
+      const legend = document.getElementById('cpuLegend');
+      legend.innerHTML = '';
+      for (let i = 0; i < coreCount; i++) {
+        const item = document.createElement('span');
+        item.className = 'leg-item';
+        item.innerHTML = `<span class="leg-dot" style="background:${CORE_COLORS[i % CORE_COLORS.length]}"></span>CPU${i}`;
+        legend.appendChild(item);
+      }
+      updateCPU(data);
+    }
+    updateMem(data);
+    updateNet(data);
+    updateDisk(data);
+    updateTraffic(data);
+    updateProcs(data);
+    updateApps(data);
+  } catch (err) {
+    console.error('Init error:', err);
+  }
+  connectSSE();
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { drawCPUChart(); drawNetChart(); drawDiskChart(); }, 200);
+});
+
+document.addEventListener('DOMContentLoaded', init);
+
+/* ===== Export Functions ===== */
+async function doExport() {
+  const btn = document.getElementById('exportBtn');
+  btn.style.opacity = '0.5';
+  btn.title = '正在导出…';
+  try {
+    const r = await fetch('/api/export');
+    const data = await r.json();
+    if (data.ok) {
+      showToast(`✅ 导出成功！\n文件: ${data.filepath}\n大小: ${(data.size_bytes/1024).toFixed(1)}KB\n${data.records.app_raw} 条应用记录`);
+    } else {
+      showToast('❌ 导出失败: ' + (data.error || '未知错误'));
+    }
+  } catch (e) {
+    showToast('❌ 请求失败: ' + e.message);
+  }
+  btn.style.opacity = '1';
+  btn.title = '一键导出所有历史数据';
+}
+
+async function openExportConfig() {
+  // Fetch current path
+  const r = await fetch('/api/export/config');
+  const data = await r.json();
+  const currentPath = data.path || '/var/exports';
+
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;width:480px;max-width:90vw;color:#e6edf3;font-size:14px;';
+  modal.onclick = (e) => e.stopPropagation();
+
+  modal.innerHTML = `
+    <h3 style="margin:0 0 16px;font-size:18px">⚙️ 导出设置</h3>
+    <label style="display:block;margin-bottom:6px;color:#8b949e">导出目录路径</label>
+    <input id="exportPathInput" type="text" value="${currentPath}"
+      style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;font-family:monospace;box-sizing:border-box;">
+    <p style="margin:8px 0 0;color:#8b949e;font-size:12px">⚠️ 必须是容器内可写的绝对路径。建议挂载到NAS目录：<code>-v /vol2/exports:/var/exports</code></p>
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">
+      <button onclick="this.closest('[style]').closest('[style]').remove()"
+        style="padding:8px 20px;border:1px solid #30363d;border-radius:8px;background:transparent;color:#e6edf3;cursor:pointer">取消</button>
+      <button onclick="saveExportPath()"
+        style="padding:8px 20px;border:none;border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer">保存</button>
+    </div>
+  `;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+async function saveExportPath() {
+  const input = document.getElementById('exportPathInput');
+  const path = input.value.trim();
+  if (!path) return;
+  try {
+    const r = await fetch('/api/export/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path})
+    });
+    const data = await r.json();
+    if (data.ok) {
+      showToast('✅ 导出路径已保存: ' + path);
+      document.querySelector('[style*="background:rgba(0,0,0,0.6)"]')?.remove();
+    } else {
+      showToast('❌ ' + (data.error || '保存失败'));
+    }
+  } catch (e) {
+    showToast('❌ 请求失败: ' + e.message);
+  }
+}
+
+function showToast(msg) {
+  const existing = document.querySelector('.fnmon-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'fnmon-toast';
+  toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#1f2937;color:#e6edf3;padding:14px 24px;border-radius:10px;font-size:14px;z-index:99999;white-space:pre-line;line-height:1.6;box-shadow:0 8px 32px rgba(0,0,0,0.4);border:1px solid #30363d;max-width:80vw;';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+}
+</script>
+</body>
+</html>

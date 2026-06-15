@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.db
+*.fpk
+export_config.json
+.env
+.gitignore
