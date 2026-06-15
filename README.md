@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🖥️ fnmon — fnOS 实时系统监控面板
+# 🖥️ 小白系统监控器 — fnOS飞牛实时系统监控面板 - docker应用
 
 **一键 Docker 部署 | 6 大监控维度 | 数据可导出**
 
